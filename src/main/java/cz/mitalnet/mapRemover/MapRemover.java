@@ -8,7 +8,6 @@ import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.Configuration;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.List;
@@ -42,13 +41,6 @@ public final class MapRemover extends JavaPlugin {
     public void onDisable() {
         getLogger().info("MapRemover byl deaktivován.");
     }
-
-    /**
-     * Zaznamenává obydlené chunky.
-     * <p>
-     * Tato metoda asynchronně prochází všechny chunky ve světě a zaznamenává ty,
-     * které jsou obydlené (obsahují rezidence). Výsledky jsou uloženy do konfigurace.
-     */
     public void startLogPopulatedChunks() {
         // Kontrola, zda je svět načten
         if (world == null) {
@@ -63,39 +55,26 @@ public final class MapRemover extends JavaPlugin {
             for (int x = -radius + skipSteps; x < radius; x++) { // Iterace po větších krocích
                 getLogger().info("Pracuju neruš (" + (x + radius) + "/" + (radius * 2) + ")");
                 for (int z = -radius; z < radius; z++) {
-                    if (!residenceManager.getByChunk(world.getChunkAt(x, z)).isEmpty()) {
-                        if (!configuration.getStringList("ObydleneResky").contains(x + "@" + z)) {
-                            configuration.getStringList("ObydleneResky").add(x + "@" + z);
-                            saveConfig();
-                            getLogger().info("Zaznamenáno (" + x + "@" + z + ")");
-                        } else {
-                            getLogger().info("Nezaznamenáno (" + x + "@" + z + ") první test");
-                        }
-                        break;
-                    }
-                    boolean residenceSearched = false;
+                    boolean residenceFound = false;
                     for (int x1 = x - 5; x1 < x + 5; x1++) {
                         for (int z1 = z - 5; z1 < z - 5; z1++) {
                             Chunk chunk = world.getChunkAt(x1, z1);
                             // Kontrola Residence a přidání do seznamu
                             if (!residenceManager.getByChunk(chunk).isEmpty()) {
-                                if (!configuration.getStringList("ObydleneResky").contains(x + "@" + z)) {
-                                    configuration.getStringList("ObydleneResky").add(x + "@" + z);
-                                    getLogger().info("Zaznamenáno (" + x + "@" + z + ")");
-                                    residenceSearched = true;
-                                } else {
-                                    getLogger().info("Nezaznamenáno (" + x + "@" + z + ")");
-                                }
+                                residenceFound = true;
                             }
-                            if (residenceSearched) {
+                            if (residenceFound) {
                                 break;
                             }
                         }
-                        if (residenceSearched) {
+                        if (residenceFound) {
                             break;
                         }
                     }
                     configuration.set("SkipSteps", x + radius);
+                    if(residenceFound){
+                        regenChunk(x,z,world);
+                    }
                     saveConfig();
                 }
             }
@@ -103,56 +82,17 @@ public final class MapRemover extends JavaPlugin {
             saveConfig();
         });
     }
-
-    /**
-     * Odstraňuje neobydlené chunky na základě konfigurace.
-     */
-    public void removeChunks() {
-        if (world == null) {
-            getLogger().warning("Svět není načten, nelze spustit odstraňování chunků.");
-            return;
-        }
-
-        Configuration configuration = getConfig();
-        List<String> obydeneResky = configuration.getStringList("ObydleneResky");
-        int radius = (int) (world.getWorldBorder().getSize() / 16);
-
-        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
-            int totalChunks = (radius * 2) * (radius * 2);
-            int processedChunks = 0;
-
-            for (int x = -radius; x < radius; x++) {
-                for (int z = -radius; z < radius; z++) {
-                    if (!obydeneResky.contains(x + "@" + z)) {
-                        try {
-                            World we = (World) BukkitAdapter.adapt(world);
-                            Extent extent = BukkitAdapter.adapt(we);
-                            extent.regenerateChunk(x, z, null, world.getSeed());
-                        } catch (Exception e) {
-                            getLogger().warning("Chyba při odstraňování chunku (" + x + "@" + z + ")");
-                        }
-                    }
-
-                    processedChunks++;
-
-                    // Vypiš průběh každých 10 % nebo poslední chunk
-                    if (processedChunks % (totalChunks / 10) == 0 || processedChunks == totalChunks) {
-                        int progressPercent = (int) ((processedChunks / (double) totalChunks) * 100);
-                        getLogger().info("Průběh odstranění chunků: " + progressPercent + "% (" + processedChunks + "/" + totalChunks + ")");
-                    }
-                }
+    public void regenChunk(int x,int z,World world){
+        Bukkit.getScheduler().runTaskAsynchronously(this,()->{
+            try {
+                Extent extent = BukkitAdapter.adapt(world);
+                extent.regenerateChunk(x, z, null, world.getSeed());
+            } catch (RuntimeException e) {
+                throw new RuntimeException(e);
             }
-
-            getLogger().info("Odstraňování chunků dokončeno!");
         });
     }
 
-
-
-
-    /**
-     * Zpracování příkazů.
-     */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
@@ -169,12 +109,6 @@ public final class MapRemover extends JavaPlugin {
             case "mitalchunklogger":
                 startLogPopulatedChunks();
                 player.sendMessage(ChatColor.GREEN + "Obydlené se začaly skenovat.");
-                return true;
-
-            case "mitalchunkremover":
-                player.sendMessage(ChatColor.YELLOW + "Odstraňování chunků právě probíhá...");
-                removeChunks();
-                player.sendMessage(ChatColor.GREEN + "Chunky byly úspěšně odstraněny.");
                 return true;
             default:
                 return false;
