@@ -1,0 +1,36 @@
+name: MapRemover
+version: '1.0'
+main: cz.mitalnet.mapRemover.MapRemover
+api-version: '1.21'
+depend: [Residence]
+commands:
+  mitalchunklogger:
+    description: Logs all populated chunks into the configuration file.
+    usage: /mitalchunklogger
+    permission: mapremover.chunklogger
+  mitalchunkremover:
+    description: Removes unpopulated chunks based on the configuration file.
+    usage: /mitalchunkremover
+    permission: mapremover.chunkremover
+  mitaltest:
+    description: Test command.
+    usage: /mitaltest
+    permission: mapremover.chunkremover
+  mitaltest2:
+    description: Test command.
+    usage: /mitaltest2
+    permission: mapremover.chunkremover
+
+permissions:
+  mapremover.chunklogger:
+    description: Allows the use of /mitalchunklogger command.
+    default: op
+  mapremover.chunkremover:
+    description: Allows the use of /mitalchunkremover command.
+    default: op
+  mapremover.test:
+    description: Allows the use of /mitaltest command.
+    default: op
+  mapremover.test2:
+    description: Allows the use of /mitaltest2 command.
+    default: op
